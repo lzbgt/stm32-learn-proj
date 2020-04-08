@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+      "main.h": "c",
+      "cmsis_os.h": "c",
+      "stdio.h": "c",
+      "stm32f101x6.h": "c"
+    }
+}
