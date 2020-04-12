@@ -24,10 +24,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "FreeRTOSConfig.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include "event_groups.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,11 +40,14 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-EventGroupHandle_t xEvtLed;
 
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -54,17 +56,14 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 128 * 4
 };
 /* USER CODE BEGIN PV */
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-void StartDefaultTask(void *argument);
-static EventGroupHandle_t xEventLed;
-#define EVENT_BITS_LED 0xFFFF
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
+static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -73,6 +72,31 @@ void StartDefaultTask(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+char tx_buff[] = "hello world!\r\n";
+char rx_buff[10] = {0};
+
+static void Println(char *fmt, ...){
+    char buff[128] = {0};
+    va_list argptr;
+    va_start(argptr, fmt);
+    vsnprintf(buff, 126, fmt, argptr);
+    va_end(argptr);
+    int idx = strlen(buff);
+    buff[idx++] = '\r';
+    buff[idx++] = '\n';
+    buff[idx] = 0;
+    HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
+}
+
+static void Print(char *fmt, ...){
+    char buff[128] = {0};
+    va_list argptr;
+    va_start(argptr, fmt);
+    vsnprintf(buff, 127, fmt, argptr);
+    va_end(argptr);
+    HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
+}
+
 
 /* USER CODE END 0 */
 
@@ -104,8 +128,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  xEventLed = xEventGroupCreate();
+
+  HAL_UART_Transmit_DMA(&huart1, (uint8_t *)tx_buff, strlen(tx_buff));
+  HAL_UART_Receive_DMA(&huart1, (uint8_t *)rx_buff, 10);
 
   /* USER CODE END 2 */
 
@@ -189,47 +217,79 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
   */
 static void MX_GPIO_Init(void)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SOC_LED_GPIO_Port, SOC_LED_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : SOC_LED_Pin */
-  GPIO_InitStruct.Pin = SOC_LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(SOC_LED_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : MY_PIN_INT_Pin */
-  GPIO_InitStruct.Pin = MY_PIN_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(MY_PIN_INT_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_GPIO_EXTI_Callback(uint16_t pinNum){
-  if(pinNum == MY_PIN_INT_Pin){
-    xEventGroupSetBitsFromISR(xEventLed, 1, NULL);
-  }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h){
+    __NOP();
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *h){
+    //HAL_UART_Transmit_DMA(h, (uint8_t *)tx_buff, strlen(tx_buff));
 }
 /* USER CODE END 4 */
 
@@ -244,37 +304,17 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-
-  // //LED OFF when pin high
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, 0);
-  /* Infinite loop */
-  #define BLINK_PERIOD 500
-  #define BLINK_TIMES 12
-  int blinkCnt = 0;
-  for(int cnt = 0; ;cnt++)
+  for(int i = 0; ;i++)
   {
-    EventBits_t bits = xEventGroupWaitBits(xEventLed, EVENT_BITS_LED, pdTRUE, pdFALSE, 500/portTICK_PERIOD_MS);
-    if((bits &1 )|| blinkCnt > 0){
-      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-      HAL_NVIC_ClearPendingIRQ(EXTI15_10_IRQn);
-      if(blinkCnt == 0){
-        blinkCnt = BLINK_TIMES;
-        cnt = 1;
-      }
-      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, cnt%2);
-      blinkCnt--;
-      if(blinkCnt == 0){
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, 0);
-        HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-      }
-    }
+    Println("lived %d sec", i);
+    osDelay(1000/portTICK_PERIOD_MS);
   }
   /* USER CODE END 5 */ 
 }
 
  /**
   * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM2 interrupt took place, inside
+  * @note   This function is called  when TIM4 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
   * a global variable "uwTick" used as application time base.
   * @param  htim : TIM handle
@@ -285,7 +325,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM2) {
+  if (htim->Instance == TIM4) {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
