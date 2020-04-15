@@ -315,47 +315,27 @@ void StartDefaultTask(void *argument)
         ST7735_DrawPixel(ST7735_WIDTH-1, y, ST7735_RED);
     }
 
-    HAL_Delay(3000);
+    osDelay(1000/portTICK_PERIOD_MS);
 
     // Check fonts
     ST7735_FillScreen(ST7735_BLACK);
-    ST7735_WriteString(0, 0, "Font_7x10, red on black, lorem ipsum dolor sit amet", Font_7x10, ST7735_RED, ST7735_BLACK);
-    ST7735_WriteString(0, 3*10, "Font_11x18, green, lorem ipsum", Font_11x18, ST7735_GREEN, ST7735_BLACK);
+    ST7735_WriteString(0, 0, "Font_7x10, red on black", Font_7x10, ST7735_RED, ST7735_BLACK);
+    ST7735_WriteString(0, 3*10, "Font_11x18, green", Font_11x18, ST7735_GREEN, ST7735_BLACK);
     ST7735_WriteString(0, 3*10+3*18, "Font_16x26", Font_16x26, ST7735_BLUE, ST7735_BLACK);
-    HAL_Delay(2000);
+    osDelay(5000/portTICK_PERIOD_MS);
 
     // Check colors
     ST7735_FillScreen(ST7735_BLACK);
     ST7735_WriteString(0, 0, "BLACK", Font_11x18, ST7735_WHITE, ST7735_BLACK);
-    HAL_Delay(500);
+    osDelay(500/portTICK_PERIOD_MS);
 
     ST7735_FillScreen(ST7735_BLUE);
     ST7735_WriteString(0, 0, "BLUE", Font_11x18, ST7735_BLACK, ST7735_BLUE);
-    HAL_Delay(500);
+    osDelay(500/portTICK_PERIOD_MS);
 
     ST7735_FillScreen(ST7735_RED);
     ST7735_WriteString(0, 0, "RED", Font_11x18, ST7735_BLACK, ST7735_RED);
-    HAL_Delay(500);
-
-    ST7735_FillScreen(ST7735_GREEN);
-    ST7735_WriteString(0, 0, "GREEN", Font_11x18, ST7735_BLACK, ST7735_GREEN);
-    HAL_Delay(500);
-
-    ST7735_FillScreen(ST7735_CYAN);
-    ST7735_WriteString(0, 0, "CYAN", Font_11x18, ST7735_BLACK, ST7735_CYAN);
-    HAL_Delay(500);
-
-    ST7735_FillScreen(ST7735_MAGENTA);
-    ST7735_WriteString(0, 0, "MAGENTA", Font_11x18, ST7735_BLACK, ST7735_MAGENTA);
-    HAL_Delay(500);
-
-    ST7735_FillScreen(ST7735_YELLOW);
-    ST7735_WriteString(0, 0, "YELLOW", Font_11x18, ST7735_BLACK, ST7735_YELLOW);
-    HAL_Delay(500);
-
-    ST7735_FillScreen(ST7735_WHITE);
-    ST7735_WriteString(0, 0, "WHITE", Font_11x18, ST7735_BLACK, ST7735_WHITE);
-    osDelay(500);
+    osDelay(500/portTICK_PERIOD_MS);
   }
   /* USER CODE END 5 */ 
 }
