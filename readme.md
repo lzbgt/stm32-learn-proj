@@ -13,3 +13,6 @@ instead of using SWD for debugging, implements two functions for outputing strin
 static void Println(char *fmt, ...); // auto adds tailing \r\n
 static void Print(char *fmt, ...); // no tailing \r\n
 ```
+
+## f1/servo-pwm
+PA0 - pwm
