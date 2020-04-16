@@ -24,6 +24,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#define ST7735_IS_80X160
+#include <stdlib.h>
 #include <string.h>
 #include "st7735/st7735.h"
 #include "st7735/fonts.h"
@@ -300,42 +302,60 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
+  uint16_t colors[] = {ST7735_GREEN, ST7735_RED, ST7735_BLUE, ST7735_MAGENTA, ST7735_YELLOW, ST7735_WHITE, ST7735_CYAN, ST7735_BLACK};
+  uint32_t tick, color;
+  char chara[2] = {0,0};
+  srand(0);
   for(;;)
   {
 
-      ST7735_FillScreen(ST7735_BLACK);
+    // ST7735_FillScreen(ST7735_BLACK);
 
-    for(int x = 0; x < ST7735_WIDTH; x++) {
-        ST7735_DrawPixel(x, 0, ST7735_RED);
-        ST7735_DrawPixel(x, ST7735_HEIGHT-1, ST7735_RED);
+    // for(int x = 0; x < ST7735_WIDTH; x++) {
+    //     ST7735_DrawPixel(x, 0, ST7735_RED);
+    //     ST7735_DrawPixel(x, ST7735_HEIGHT-1, ST7735_RED);
+    // }
+
+    // for(int y = 0; y < ST7735_HEIGHT; y++) {
+    //     ST7735_DrawPixel(0, y, ST7735_RED);
+    //     ST7735_DrawPixel(ST7735_WIDTH-1, y, ST7735_RED);
+    // }
+
+    // osDelay(1000/portTICK_PERIOD_MS);
+
+    // // Check fonts
+    // ST7735_FillScreen(ST7735_BLACK);
+    // ST7735_WriteString(0, 0, "Font_7x10, red on black", Font_7x10, ST7735_RED, ST7735_BLACK);
+    // ST7735_WriteString(0, 3*10, "Font_11x18, green", Font_11x18, ST7735_GREEN, ST7735_BLACK);
+    // ST7735_WriteString(0, 3*10+3*18, "Font_16x26", Font_16x26, ST7735_BLUE, ST7735_BLACK);
+    // osDelay(5000/portTICK_PERIOD_MS);
+
+    // // Check colors
+    // ST7735_FillScreen(ST7735_BLACK);
+    // ST7735_WriteString(0, 0, "BLACK", Font_11x18, ST7735_WHITE, ST7735_BLACK);
+    // osDelay(500/portTICK_PERIOD_MS);
+
+    // ST7735_FillScreen(ST7735_BLUE);
+    // ST7735_WriteString(0, 0, "BLUE", Font_11x18, ST7735_BLACK, ST7735_BLUE);
+    // osDelay(500/portTICK_PERIOD_MS);
+
+    // ST7735_FillScreen(ST7735_RED);
+    // ST7735_WriteString(0, 0, "RED", Font_11x18, ST7735_BLACK, ST7735_RED);
+    
+    for(int i = 0; i < 10; i++){
+        int idx = rand()%8;
+        color = colors[idx];
+        ST7735_FillScreen(color);
+        chara[0] = 48 +i;
+        ST7735_WriteString(66, 24, chara, Font_16x26, colors[(idx+3)%8], color);
+        osDelay(200/portTICK_PERIOD_MS);
     }
+    
 
-    for(int y = 0; y < ST7735_HEIGHT; y++) {
-        ST7735_DrawPixel(0, y, ST7735_RED);
-        ST7735_DrawPixel(ST7735_WIDTH-1, y, ST7735_RED);
-    }
-
-    osDelay(1000/portTICK_PERIOD_MS);
-
-    // Check fonts
-    ST7735_FillScreen(ST7735_BLACK);
-    ST7735_WriteString(0, 0, "Font_7x10, red on black", Font_7x10, ST7735_RED, ST7735_BLACK);
-    ST7735_WriteString(0, 3*10, "Font_11x18, green", Font_11x18, ST7735_GREEN, ST7735_BLACK);
-    ST7735_WriteString(0, 3*10+3*18, "Font_16x26", Font_16x26, ST7735_BLUE, ST7735_BLACK);
+    #ifdef ST7735_IS_80X160
+    ST7735_DrawImage(0, 0, ST7735_WIDTH, ST7735_HEIGHT, (uint16_t*)test_img_80x160);
+    #endif
     osDelay(5000/portTICK_PERIOD_MS);
-
-    // Check colors
-    ST7735_FillScreen(ST7735_BLACK);
-    ST7735_WriteString(0, 0, "BLACK", Font_11x18, ST7735_WHITE, ST7735_BLACK);
-    osDelay(500/portTICK_PERIOD_MS);
-
-    ST7735_FillScreen(ST7735_BLUE);
-    ST7735_WriteString(0, 0, "BLUE", Font_11x18, ST7735_BLACK, ST7735_BLUE);
-    osDelay(500/portTICK_PERIOD_MS);
-
-    ST7735_FillScreen(ST7735_RED);
-    ST7735_WriteString(0, 0, "RED", Font_11x18, ST7735_BLACK, ST7735_RED);
-    osDelay(500/portTICK_PERIOD_MS);
   }
   /* USER CODE END 5 */ 
 }

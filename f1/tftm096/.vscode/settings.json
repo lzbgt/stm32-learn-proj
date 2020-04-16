@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "st7735.h": "c"
+        "st7735.h": "c",
+        "testimg.h": "c"
     }
 }
