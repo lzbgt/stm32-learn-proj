@@ -334,13 +334,6 @@ void StartDefaultTask(void *argument)
     // ST7735_FillScreen(ST7735_BLACK);
     // ST7735_WriteString(0, 0, "BLACK", Font_11x18, ST7735_WHITE, ST7735_BLACK);
     // osDelay(500/portTICK_PERIOD_MS);
-
-    // ST7735_FillScreen(ST7735_BLUE);
-    // ST7735_WriteString(0, 0, "BLUE", Font_11x18, ST7735_BLACK, ST7735_BLUE);
-    // osDelay(500/portTICK_PERIOD_MS);
-
-    // ST7735_FillScreen(ST7735_RED);
-    // ST7735_WriteString(0, 0, "RED", Font_11x18, ST7735_BLACK, ST7735_RED);
     
     for(int i = 0; i < 10; i++){
         int idx = rand()%8;
