@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define ST7735_IS_80X160
+//#define ST7735_IS_80X160
 #include <stdlib.h>
 #include <string.h>
 #include "st7735/st7735.h"
@@ -272,11 +272,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PA1 PA2 PA3 PA4 */
   GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4;
@@ -306,7 +313,10 @@ void StartDefaultTask(void *argument)
   uint32_t tick, color;
   char chara[2] = {0,0};
   srand(0);
-  for(;;)
+  uint16_t currBgColor = 999999;
+  ST7735_FillScreen(ST7735_BLACK);
+  const char *strOffOn[] = {"OFF", " ON"};
+  for(int i = 0;;i++)
   {
 
     // ST7735_FillScreen(ST7735_BLACK);
@@ -331,24 +341,13 @@ void StartDefaultTask(void *argument)
     // osDelay(5000/portTICK_PERIOD_MS);
 
     // // Check colors
-    // ST7735_FillScreen(ST7735_BLACK);
-    // ST7735_WriteString(0, 0, "BLACK", Font_11x18, ST7735_WHITE, ST7735_BLACK);
-    // osDelay(500/portTICK_PERIOD_MS);
-    
-    for(int i = 0; i < 10; i++){
-        int idx = rand()%8;
-        color = colors[idx];
-        ST7735_FillScreen(color);
-        chara[0] = 48 +i;
-        ST7735_WriteString(66, 24, chara, Font_16x26, colors[(idx+3)%8], color);
-        osDelay(200/portTICK_PERIOD_MS);
-    }
-    
+    ST7735_WriteString(0, 0, strOffOn[i%2], Font_11x18, ST7735_YELLOW, ST7735_BLACK);
+    osDelay(500/portTICK_PERIOD_MS);
 
     #ifdef ST7735_IS_80X160
     ST7735_DrawImage(0, 0, ST7735_WIDTH, ST7735_HEIGHT, (uint16_t*)test_img_80x160);
-    #endif
     osDelay(5000/portTICK_PERIOD_MS);
+    #endif
   }
   /* USER CODE END 5 */ 
 }
