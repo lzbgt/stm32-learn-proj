@@ -19,4 +19,4 @@ PA0 - pwm
 
 
 ## f1/tftm096
-display image on screen
+doppler radar motion detection

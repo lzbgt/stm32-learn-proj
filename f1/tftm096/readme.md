@@ -13,3 +13,5 @@
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi1.Init.CRCPolynomial = 10;
 ```
+
+PC13 is for rcwl-0516
