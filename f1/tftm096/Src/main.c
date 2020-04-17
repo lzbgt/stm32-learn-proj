@@ -25,6 +25,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 //#define ST7735_IS_80X160
+#include <FreeRTOSConfig.h>
+#include <projdefs.h>
+#include <FreeRTOS.h>
+#include <event_groups.h>
+#include <task.h>
 #include <stdlib.h>
 #include <string.h>
 #include "st7735/st7735.h"
@@ -59,7 +64,9 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 128 * 4
 };
 /* USER CODE BEGIN PV */
-
+static EventGroupHandle_t xEvtGrpGPIOInt;
+#define EVENT_BIT_HUMAN_DETECT 0x01
+#define EVENT_BITS_GPIO 0xFFFF
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -110,6 +117,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   ST7735_Init();
+  xEvtGrpGPIOInt = xEventGroupCreate();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -209,12 +217,12 @@ static void MX_SPI1_Init(void)
   /* SPI1 parameter configuration*/
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_1LINE;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -281,7 +289,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
@@ -292,10 +300,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_GPIO_EXTI_Callback(uint16_t pinNum){
+  if(pinNum == GPIO_PIN_13){
+    xEventGroupSetBitsFromISR(xEvtGrpGPIOInt, EVENT_BIT_HUMAN_DETECT, pdFALSE);
+  }
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -315,7 +331,9 @@ void StartDefaultTask(void *argument)
   srand(0);
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
-  const char *strOffOn[] = {"OFF", " ON"};
+  const char *strOffOn[] = {"NO HUMAN DETECTED", "  "};
+  char strOneDigit[2] = {0,0};
+  ST7735_WriteString(0, 0, strOffOn[0], Font_11x18, ST7735_YELLOW, ST7735_BLACK);
   for(int i = 0;;i++)
   {
 
@@ -341,8 +359,14 @@ void StartDefaultTask(void *argument)
     // osDelay(5000/portTICK_PERIOD_MS);
 
     // // Check colors
-    ST7735_WriteString(0, 0, strOffOn[i%2], Font_11x18, ST7735_YELLOW, ST7735_BLACK);
-    osDelay(500/portTICK_PERIOD_MS);
+    EventBits_t bits = xEventGroupWaitBits(xEvtGrpGPIOInt, EVENT_BITS_GPIO, pdTRUE, pdFALSE, 10000/portTICK_PERIOD_MS);
+    if(bits & EVENT_BIT_HUMAN_DETECT){
+        ST7735_WriteString(0, 0, strOffOn[1], Font_11x18, ST7735_YELLOW, ST7735_BLACK);
+    }else{
+        ST7735_WriteString(0, 0, strOffOn[0], Font_11x18, ST7735_YELLOW, ST7735_BLACK);
+    }
+    strOneDigit[0] = i%10+48;
+    ST7735_WriteString(0, 18*2+2, strOneDigit, Font_11x18, ST7735_YELLOW, ST7735_BLACK);
 
     #ifdef ST7735_IS_80X160
     ST7735_DrawImage(0, 0, ST7735_WIDTH, ST7735_HEIGHT, (uint16_t*)test_img_80x160);
@@ -355,7 +379,7 @@ void StartDefaultTask(void *argument)
  /**
   * @brief  Period elapsed callback in non blocking mode
   * @note   This function is called  when TIM4 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * HAL_TIM_IRQHandler(). It makes a direcat call to HAL_IncTick() to increment
   * a global variable "uwTick" used as application time base.
   * @param  htim : TIM handle
   * @retval None
