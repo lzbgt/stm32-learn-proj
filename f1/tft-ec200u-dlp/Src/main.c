@@ -209,8 +209,12 @@ void TaskUart1Rx(void *pvParameters)
     uart1_main_buff[sz] = 0;
     ST7735_WriteString(0, 10 * 3, info, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-
-    ST7735_WriteString(0, 10 * 2, uart1_main_buff, Font_7x10, ST7735_YELLOW,
+    ST7735_WriteString(0, 10 * 5, uart1_main_buff, Font_7x10, ST7735_YELLOW,
+                       ST7735_BLACK);
+    char sizeInfo[] = {0, 0, 0};
+    sizeInfo[1] = sz % 10 + 48;
+    sizeInfo[0] = sz / 10 + 48;
+    ST7735_WriteString(0, 10 * 6, sizeInfo, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
   }
 }
