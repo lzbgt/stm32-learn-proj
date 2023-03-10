@@ -27,7 +27,7 @@
 #include "st7735/fonts.h"
 #include "st7735/st7735.h"
 #include "st7735/testimg.h"
-#include "ringbuf/ringbuf_adaptor.h"
+#include "utils/ringbuf_adaptor.h"
 #include <FreeRTOS.h>
 #include <FreeRTOSConfig.h>
 #include <event_groups.h>
@@ -113,6 +113,7 @@ static int uart1_state_next = 0;
 #define UART1_RX_BUFF_SIZE 400
 #define UART1_MAIN_BUFF_SIZE 400
 #define UART1_TX_BUFF_SIZE 200
+
 uint8_t uart1_tx_buff[UART1_TX_BUFF_SIZE] = {0};
 uint8_t uart1_rx_buff[UART1_RX_BUFF_SIZE] = {0};
 uint8_t uart1_main_buff[UART1_MAIN_BUFF_SIZE] = {0};
@@ -170,51 +171,45 @@ int uart1_state_machine()
   return 0;
 }
 
-static char info[] = {0, 0, 0};
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  info[1] = Size % 10 + 48;
-  info[0] = Size / 10 + 48;
-  ST7735_WriteString(0, 10 * 4, info, Font_7x10, ST7735_YELLOW,
-                     ST7735_BLACK);
-
   if (huart == &huart1)
   {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
     BaseType_t r = xQueueSendFromISR(xUart1RxQueue, &Size, &xHigherPriorityTaskWoken);
-    uart1_buff.setcursor(&uart1_buff, Size);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
 }
 
-int data_from_ringbuf(uint8_t *ring, uint8_t *dst, int16_t ringsiz, int16_t oldpos, int16_t currpos)
-{
-  // full or none
-  if (oldpos == currpos)
-  {
-  }
-}
-
+// receive data from cloud server
 void TaskUart1Rx(void *pvParameters)
 {
-  uint16_t size;
-  uint16_t sz;
+  int16_t size;
+  int16_t sz;
   for (int j = 0;; j++)
   {
-    /* Wait for new data to be available */
     xQueueReceive(xUart1RxQueue, &size, portMAX_DELAY);
-    info[1] = size % 10 + 48;
-    info[0] = size / 10 + 48;
-    sz = uart1_buff.read(&uart1_buff, uart1_main_buff);
+    sz = size;
+    if (sz > UART1_RX_BUFF_SIZE)
+    {
+      sz -= UART1_RX_BUFF_SIZE;
+    }
+
+    sz = uart1_buff.read(&uart1_buff, uart1_main_buff, sz);
     uart1_main_buff[sz] = 0;
-    ST7735_WriteString(0, 10 * 3, info, Font_7x10, ST7735_YELLOW,
+    char sizeInfo[] = "u1 ring:     ";
+    itoa(sz, sizeInfo + 8, 10);
+    char uart_sz_info[] = "u1rx sz:     ";
+    itoa(size, uart_sz_info + 8, 10);
+
+    ST7735_WriteString(0, 10 * 2, uart_sz_info, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-    ST7735_WriteString(0, 10 * 5, uart1_main_buff, Font_7x10, ST7735_YELLOW,
+
+    ST7735_WriteString(0, 10 * 3, sizeInfo, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-    char sizeInfo[] = {0, 0, 0};
-    sizeInfo[1] = sz % 10 + 48;
-    sizeInfo[0] = sz / 10 + 48;
-    ST7735_WriteString(0, 10 * 6, sizeInfo, Font_7x10, ST7735_YELLOW,
+
+    ST7735_WriteString(0, 10 * 4, uart1_main_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
   }
 }
@@ -532,22 +527,17 @@ void StartDefaultTask(void *argument)
   uint16_t colors[] = {ST7735_GREEN, ST7735_RED, ST7735_BLUE, ST7735_MAGENTA,
                        ST7735_YELLOW, ST7735_WHITE, ST7735_CYAN, ST7735_BLACK};
   uint32_t tick, color;
-  char chara[2] = {0, 0};
+  char number_buff[5] = {0};
   srand(0);
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
-  const char *cmd_result = "RESULT";
-  char strOneDigit[2] = {0, 0};
-  ST7735_WriteString(0, 0, cmd_result, Font_7x10, ST7735_YELLOW,
-                     ST7735_BLACK);
-
   osDelay(5000 / portTICK_PERIOD_MS);
 
   for (int i = 0;; i++)
   {
     uart1_state_machine();
-    strOneDigit[0] = uart1_result % 10 + 48;
-    ST7735_WriteString(0, 10, strOneDigit, Font_7x10, ST7735_YELLOW,
+    itoa(uart1_result, number_buff, 10);
+    ST7735_WriteString(0, 0, number_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
     EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 1000 / portTICK_PERIOD_MS);
     if (bits)
@@ -559,8 +549,8 @@ void StartDefaultTask(void *argument)
     }
     else
     {
-      strOneDigit[0] = i % 10 + 48;
-      ST7735_WriteString(0, 10 * 2, strOneDigit, Font_7x10, ST7735_YELLOW,
+      itoa(i, number_buff, 10);
+      ST7735_WriteString(0, 10 * 1, number_buff, Font_7x10, ST7735_YELLOW,
                          ST7735_BLACK);
     }
   }

@@ -39,7 +39,7 @@ C_SOURCES =  \
 Src/main.c \
 Src/st7735/fonts.c \
 Src/st7735/st7735.c \
-Src/ringbuf/ringbuf_adaptor.c \
+Src/utils/ringbuf_adaptor.c \
 Src/freertos.c \
 Src/stm32f1xx_it.c \
 Src/stm32f1xx_hal_msp.c \

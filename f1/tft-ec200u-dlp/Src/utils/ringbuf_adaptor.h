@@ -19,13 +19,12 @@ struct RingBuf;
 typedef struct RingBuf
 {
   uint8_t *src;
-  uint16_t size;
-  uint16_t last;
-  uint16_t curr;
-  int (*read)(struct RingBuf *self, uint8_t *dst);
-  int (*setcursor)(struct RingBuf *self, uint16_t curr);
+  int16_t size;
+  int16_t last;
+  int full;
+  int (*read)(struct RingBuf *self, uint8_t *dst, int16_t curr);
 } RingBuf;
 
-RingBuf ringbuf_new(uint8_t *src, uint16_t size);
+RingBuf ringbuf_new(uint8_t *src, int16_t size);
 
 #endif
