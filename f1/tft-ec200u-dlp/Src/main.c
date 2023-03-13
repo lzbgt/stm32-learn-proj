@@ -211,8 +211,8 @@ void TaskUart1Rx(void *pvParameters)
     ST7735_WriteString(0, 10 * 4, uart1_main_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
 
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
-    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
+    // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   }
 }
 
@@ -254,7 +254,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   ST7735_Init();
   HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+  // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -533,7 +533,7 @@ void StartDefaultTask(void *argument)
   srand(0);
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
-  osDelay(5000 / portTICK_PERIOD_MS);
+  // osDelay(5000 / portTICK_PERIOD_MS);
 
   for (int i = 0;; i++)
   {
