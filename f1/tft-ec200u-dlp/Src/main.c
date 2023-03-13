@@ -177,6 +177,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     BaseType_t r = xQueueSendFromISR(xUart1RxQueue, &Size, &xHigherPriorityTaskWoken);
+    HAL_UART_DMAStop(&huart1);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
+    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
 }
@@ -195,24 +198,17 @@ void TaskUart1Rx(void *pvParameters)
       sz -= UART1_RX_BUFF_SIZE;
     }
 
-    sz = uart1_buff.read(&uart1_buff, uart1_main_buff, sz);
-    uart1_main_buff[sz] = 0;
-    char sizeInfo[] = "u1 ring:     ";
-    itoa(sz, sizeInfo + 8, 10);
+    // sz = uart1_buff.read(&uart1_buff, uart1_main_buff, sz);
+    memcpy(uart1_main_buff, uart1_rx_buff, size);
+    uart1_main_buff[size] = 0;
     char uart_sz_info[] = "u1rx sz:     ";
     itoa(size, uart_sz_info + 8, 10);
 
     ST7735_WriteString(0, 10 * 2, uart_sz_info, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
 
-    ST7735_WriteString(0, 10 * 3, sizeInfo, Font_7x10, ST7735_YELLOW,
-                       ST7735_BLACK);
-
     ST7735_WriteString(0, 10 * 4, uart1_main_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-
-    // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
-    // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   }
 }
 
@@ -254,7 +250,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   ST7735_Init();
   HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
-  // __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   /* USER CODE END 2 */
 
   /* Init scheduler */

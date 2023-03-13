@@ -30,6 +30,7 @@ static int read(RingBuf *self, uint8_t *dst, int16_t curr)
   memcpy(dst, self->src + self->last, sz);
   memcpy(dst + sz, self->src, curr);
   sz += curr;
+  dst[sz] = 0;
 
   self->last = curr;
   return sz;
