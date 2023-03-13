@@ -176,7 +176,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   if (huart == &huart1)
   {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
     BaseType_t r = xQueueSendFromISR(xUart1RxQueue, &Size, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
@@ -211,6 +210,9 @@ void TaskUart1Rx(void *pvParameters)
 
     ST7735_WriteString(0, 10 * 4, uart1_main_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
+
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
+    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   }
 }
 
