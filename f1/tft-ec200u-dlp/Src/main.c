@@ -103,7 +103,7 @@ static int uart1_state_next = 0;
 
 #define UART1_RX_BUFF_SIZE 400
 #define UART1_MAIN_BUFF_SIZE 400
-#define UART1_TX_BUFF_SIZE 200
+#define UART1_TX_BUFF_SIZE 400
 
 uint8_t uart1_tx_buff[UART1_TX_BUFF_SIZE] = {0};
 uint8_t uart1_rx_buff[UART1_RX_BUFF_SIZE] = {0};
@@ -123,31 +123,34 @@ state machine
 4 -> 0
 */
 
-static char uart1_cmd_buff[400] = {0};
-
 static char *
-make_at_cmd(int state)
+make_tx_buffer()
 {
-  if (state == 0)
+  if (uart1_state_next == 0)
   {
-    strcpy(uart1_cmd_buff, "AT+CGATT?\r\n");
+    strcpy(uart1_tx_buff, "AT+CGATT?\r\n");
   }
-  else if (state == 1)
+  else if (uart1_state_next == 1)
   {
-    strcpy(uart1_cmd_buff, "ATEO\r\n");
+    strcpy(uart1_tx_buff, "ATEO\r\n");
   }
   // tcp connect
-  else if (state == 2)
+  else if (uart1_state_next == 2)
   {
-    strcpy(uart1_cmd_buff, "+QIOPEN=1,2,\"TCP\",47.100.172.167,30000,0,0\r\n");
+    strcpy(uart1_tx_buff, "+QIOPEN=1,2,\"TCP\",47.100.172.167,30000,0,0\r\n");
+  }
+  // tcp send
+  else if (uart1_state_next == 3)
+  {
+    // user fill uart1_tx_buff
   }
   // tcp close
-  else if (state == 3)
+  else if (uart1_state_next == 4)
   {
-    strcpy(uart1_cmd_buff, "AT+QICLOSE=0\r\n");
+    strcpy(uart1_tx_buff, "AT+QICLOSE=0\r\n");
   }
 
-  return uart1_cmd_buff;
+  return uart1_tx_buff;
 }
 
 static int parse_result(char *buff, char *expect)
@@ -173,9 +176,13 @@ static int parse_result(char *buff, char *expect)
 int uart1_state_machine()
 {
   char *cmd = NULL;
-  cmd = make_at_cmd(uart1_state_next);
+  cmd = make_tx_buffer(uart1_state_next);
   uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
-  uart1_state_next += 1;
+  if (uart1_state_next != 3)
+  {
+    uart1_state_next += 1;
+  }
+
   if (uart1_state_next >= 4)
   {
     uart1_state_next = 0;
