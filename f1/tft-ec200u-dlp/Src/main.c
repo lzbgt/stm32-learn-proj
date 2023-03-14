@@ -75,6 +75,7 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE BEGIN PV */
 static EventGroupHandle_t xEvtGrpUART1;
 #define EVENT_BIT_UART1_TXCMPLT 0x01
+#define EVENT_BIT_UART1_RXCMPLT 0x02
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,16 +96,6 @@ void StartDefaultTask(void *argument);
 QueueHandle_t xUart1RxQueue = NULL;
 osThreadId_t xTrheadUart1Rx;
 
-static char *server = "47.100.172.167";
-static char *port = "30000";
-static char *cmds[] = {
-    "AT+CGATT?\r\n",
-    "AT+QIOPEN=1,0,\"TCP\",%s,%s,0,2\r\n",
-    "AT+QIRD=0\r\n",
-    "AT+QICLOSE=0\r\n",
-};
-static char *OK = "OK";
-static char *GATTOK = "+CGATT: 1";
 static int uart3_result = 0;
 static int uart1_result = 0;
 static int uart1_state_last = 0;
@@ -132,40 +123,62 @@ state machine
 4 -> 0
 */
 
+static char uart1_cmd_buff[400] = {0};
+
 static char *
-make_cmd_send()
+make_at_cmd(int state)
 {
+  if (state == 0)
+  {
+    strcpy(uart1_cmd_buff, "AT+CGATT?\r\n");
+  }
+  else if (state == 1)
+  {
+    strcpy(uart1_cmd_buff, "ATEO\r\n");
+  }
+  // tcp connect
+  else if (state == 2)
+  {
+    strcpy(uart1_cmd_buff, "+QIOPEN=1,2,\"TCP\",47.100.172.167,30000,0,0\r\n");
+  }
+  // tcp close
+  else if (state == 3)
+  {
+    strcpy(uart1_cmd_buff, "AT+QICLOSE=0\r\n");
+  }
+
+  return uart1_cmd_buff;
+}
+
+static int parse_result(char *buff, char *expect)
+{
+  int len = strlen(expect);
+  char _exp[len + 1];
+  _exp[0] = ':';
+
+  strncpy(_exp + 1, expect, len);
+  if (!strstr(buff, "OK"))
+  {
+    return -1;
+  }
+
+  if (expect != NULL && !strstr(buff, ""))
+  {
+    return -1;
+  }
+
+  return 0;
 }
 
 int uart1_state_machine()
 {
-  switch (uart1_state_next)
+  char *cmd = NULL;
+  cmd = make_at_cmd(uart1_state_next);
+  uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
+  uart1_state_next += 1;
+  if (uart1_state_next >= 4)
   {
-  case 0:
-  {
-    uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmds[0], strlen(cmds[0]));
-    break;
-  }
-  case 1:
-  {
-    break;
-  }
-  case 2:
-  {
-    break;
-  }
-
-  case 3:
-  {
-    break;
-  }
-
-  default:
-  {
-    uart1_state_last = uart1_state_next;
     uart1_state_next = 0;
-    uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmds[2], strlen(cmds[2]));
-  }
   }
 
   return 0;
@@ -207,8 +220,11 @@ void TaskUart1Rx(void *pvParameters)
     ST7735_WriteString(0, 10 * 2, uart_sz_info, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
 
+    ST7735_FillRectangle(0, 10 * 4, ST7735_WIDTH, ST7735_HEIGHT * 3, ST7735_BLACK);
+
     ST7735_WriteString(0, 10 * 4, uart1_main_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
+    xEventGroupSetBits(xEvtGrpUART1, EVENT_BIT_UART1_RXCMPLT);
   }
 }
 
@@ -504,8 +520,10 @@ static void MX_GPIO_Init(void)
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *h)
 {
-  if (h->Instance == &huart1)
+  if (h == &huart1)
   {
+    ST7735_WriteString(0, 10 * 3, "tx cplt", Font_7x10, ST7735_YELLOW,
+                       ST7735_BLACK);
     xEventGroupSetBitsFromISR(xEvtGrpUART1, EVENT_BIT_UART1_TXCMPLT, pdFALSE);
   }
 }
@@ -530,21 +548,29 @@ void StartDefaultTask(void *argument)
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
   // osDelay(5000 / portTICK_PERIOD_MS);
-
+  uart1_state_machine();
   for (int i = 0;; i++)
   {
-    uart1_state_machine();
     itoa(uart1_result, number_buff, 10);
     ST7735_WriteString(0, 0, number_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-    EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 1000 / portTICK_PERIOD_MS);
+
+    // wait 1s for command to send
+    EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 5000 / portTICK_PERIOD_MS);
     if (bits)
     {
       if (bits & EVENT_BIT_UART1_TXCMPLT)
       {
-        // uart1_state_machine();
+        // wait for rx result
+        bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 10000 / portTICK_PERIOD_MS);
+        if (bits & EVENT_BIT_UART1_RXCMPLT)
+        {
+          // todo: handle packets
+          uart1_state_machine();
+        }
       }
     }
+    // timeout waiting command sent
     else
     {
       itoa(i, number_buff, 10);
