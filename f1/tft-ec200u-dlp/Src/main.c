@@ -243,26 +243,25 @@ int tcp_connect(state)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   // 4G modem
   if (huart == &huart1)
   {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
     BaseType_t r = xQueueSendFromISR(xUart1RxQueue, &Size, &xHigherPriorityTaskWoken);
     HAL_UART_DMAStop(&huart1);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
     __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
   // TI NIRSCANNANO
   else if (huart == &huart3)
   {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     BaseType_t r = xQueueSendFromISR(xUart3RxQueue, &Size, &xHigherPriorityTaskWoken);
     HAL_UART_DMAStop(&huart3);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buff, UART3_RX_BUFF_SIZE);
-    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
   }
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 // receive data from cloud server
@@ -680,7 +679,7 @@ void StartDefaultTask(void *argument)
 
         // receive msg from uart3
         int size = 0;
-        xQueueReceive(xUart1RxQueue, &size, portMAX_DELAY);
+        xQueueReceive(xUart3RxQueue, &size, portMAX_DELAY);
         memcpy(uart3_main_buff, uart3_rx_buff, size);
         // send to platform via 4G model
         int sz = 0;
