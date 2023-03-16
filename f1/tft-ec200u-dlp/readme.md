@@ -41,5 +41,6 @@
 ```
 
 
+3. pinouts
 
-PC13 is for rcwl-0516
+![pinouts](./pinouts.png)
