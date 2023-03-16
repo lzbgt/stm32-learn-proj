@@ -157,7 +157,8 @@ void uart1_handle_rx(char *buff)
 {
   if (uart1_state_last == 0)
   {
-    if (!strstr(buff, "OK" && !strstr(uart1_main_buff, "+CGATT: 1")))
+    // not ok
+    if (!strstr(buff, "OK") || !strstr(buff, "+CGATT: 1"))
     {
       // NOT OK
       uart1_state_next = 0;
@@ -169,8 +170,10 @@ void uart1_handle_rx(char *buff)
     return;
   }
 
+  // last ATEO
   if (uart1_state_last == 1)
   {
+    // not ok
     if (!strstr(buff, "NO CARRIER"))
     {
       uart1_state_next = 1;
@@ -182,10 +185,13 @@ void uart1_handle_rx(char *buff)
     return;
   }
 
+  //
   if (uart1_state_last == 2)
   {
+    // no error
     if (!strstr(buff, "ERROR"))
     {
+      // TCP connected state
       uart1_state_next = 3;
     }
     else
@@ -210,6 +216,7 @@ int tcp_connect(state)
   if (cmd[0] != 0)
   {
     uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
+    uart1_state_last = state;
   }
 
   return 0;
@@ -555,7 +562,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *h)
   {
     ST7735_WriteString(0, 10 * 3, "tx cplt", Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
-    xEventGroupSetBitsFromISR(xEvtGrpUART1, EVENT_BIT_UART1_TXCMPLT, pdFALSE);
+    // xEventGroupSetBitsFromISR(xEvtGrpUART1, EVENT_BIT_UART1_TXCMPLT, pdFALSE);
   }
 }
 /* USER CODE END 4 */
@@ -579,6 +586,8 @@ void StartDefaultTask(void *argument)
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
   // osDelay(5000 / portTICK_PERIOD_MS);
+  uart1_state_next = 0;
+  uart1_state_last = 0;
   tcp_connect(uart1_state_next);
   for (int i = 0;; i++)
   {
@@ -586,38 +595,45 @@ void StartDefaultTask(void *argument)
     ST7735_WriteString(0, 0, number_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
 
-    // wait 1s for command to send
-    EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 5000 / portTICK_PERIOD_MS);
+    // wait 1s for command to rx
+    EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 3000 / portTICK_PERIOD_MS);
     if (bits)
     {
-      if (bits & EVENT_BIT_UART1_TXCMPLT)
+      if (bits & EVENT_BIT_UART1_RXCMPLT)
       {
-        // wait for rx result
-        bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 3000 / portTICK_PERIOD_MS);
-        if (bits & EVENT_BIT_UART1_RXCMPLT)
+        if (uart1_state_next == 3)
         {
-          if (uart1_state_next == 3)
+          for (int j = 0;; j++)
           {
-            // TODO: handle rcv packet
-          }
-          else
-          {
-            uart1_handle_rx(uart1_main_buff);
-            tcp_connect(uart1_state_next);
+            char buff[10] = {0};
+            buff[9] = 0;
+            itoa(j, buff, 10);
+            uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
+            osDelay(1000);
           }
         }
         else
         {
-          // timeout rx, restart
-          uart1_state_last = 0;
-          uart1_state_next = 0;
+          uart1_handle_rx(uart1_main_buff);
           tcp_connect(uart1_state_next);
         }
       }
+      else
+      {
+        uart1_state_last = 0;
+        uart1_state_next = 0;
+        tcp_connect(uart1_state_next);
+      }
     }
-    // timeout waiting command sent
+    // timeout waiting command rx
     else
     {
+      if (uart1_state_next != 3)
+      {
+        uart1_state_last = uart1_state_next;
+        uart1_state_next = 0;
+        tcp_connect(uart1_state_next);
+      }
       itoa(i, number_buff, 10);
       ST7735_WriteString(0, 10 * 1, number_buff, Font_7x10, ST7735_YELLOW,
                          ST7735_BLACK);
