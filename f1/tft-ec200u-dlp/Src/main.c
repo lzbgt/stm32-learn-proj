@@ -137,15 +137,19 @@ make_tx_buffer(int state)
   // tcp connect
   else if (state == 2)
   {
-    strcpy(uart1_tx_buff, "+QIOPEN=1,2,\"TCP\",47.100.172.167,30000,0,0\r\n");
+    strcpy(uart1_tx_buff, "AT+QIOPEN=1,0,\"TCP\",47.100.172.167,30000,0,2\r\n");
   }
-  // tcp send
+  // tcp connected
   else if (state == 3)
   {
     // user fill uart1_tx_buff
   }
-  // tcp close
   else if (state == 4)
+  {
+    strcpy(uart1_tx_buff, "AT+QISWTMD\r\n");
+  }
+  // tcp close
+  else if (state == 5)
   {
     strcpy(uart1_tx_buff, "AT+QICLOSE=0\r\n");
   }
@@ -189,20 +193,26 @@ void uart1_handle_rx(char *buff)
   if (uart1_state_last == 2)
   {
     // no error
-    if (!strstr(buff, "ERROR"))
+    if (strstr(buff, "CONNECT"))
     {
       // TCP connected state
       uart1_state_next = 3;
     }
     else
     {
-      uart1_state_next = 4;
+      uart1_state_next = 0;
     }
     return;
   }
 
   if (uart1_state_last == 4)
   {
+    uart1_state_next++;
+    return;
+  }
+  if (uart1_state_last == 5)
+  {
+    uart1_state_last = 0;
     uart1_state_next = 0;
     return;
   }
@@ -217,6 +227,7 @@ int tcp_connect(state)
   {
     uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
     uart1_state_last = state;
+    cmd[0] = 0;
   }
 
   return 0;
@@ -244,10 +255,6 @@ void TaskUart1Rx(void *pvParameters)
   {
     xQueueReceive(xUart1RxQueue, &size, portMAX_DELAY);
     sz = size;
-    if (sz > UART1_RX_BUFF_SIZE)
-    {
-      sz -= UART1_RX_BUFF_SIZE;
-    }
 
     // sz = uart1_buff.read(&uart1_buff, uart1_main_buff, sz);
     memcpy(uart1_main_buff, uart1_rx_buff, size);
@@ -589,54 +596,71 @@ void StartDefaultTask(void *argument)
   uart1_state_next = 0;
   uart1_state_last = 0;
   tcp_connect(uart1_state_next);
+  int connected = 0;
+  EventBits_t bits = 0;
   for (int i = 0;; i++)
   {
     itoa(uart1_result, number_buff, 10);
     ST7735_WriteString(0, 0, number_buff, Font_7x10, ST7735_YELLOW,
                        ST7735_BLACK);
 
-    // wait 1s for command to rx
-    EventBits_t bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 3000 / portTICK_PERIOD_MS);
-    if (bits)
+    // connected
+    if (uart1_state_next != 3)
     {
-      if (bits & EVENT_BIT_UART1_RXCMPLT)
+      // 1.5ms delay for tx
+      // 5 ms for tx and tx
+      osDelay(1500);
+      bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 5000 / portTICK_PERIOD_MS);
+      if (bits)
       {
-        if (uart1_state_next == 3)
-        {
-          for (int j = 0;; j++)
-          {
-            char buff[10] = {0};
-            buff[9] = 0;
-            itoa(j, buff, 10);
-            uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
-            osDelay(1000);
-          }
-        }
-        else
+        if (bits & EVENT_BIT_UART1_RXCMPLT)
         {
           uart1_handle_rx(uart1_main_buff);
           tcp_connect(uart1_state_next);
         }
+        else
+        {
+          uart1_state_last = 0;
+          uart1_state_next = 0;
+          tcp_connect(uart1_state_next);
+        }
       }
+      // timeout waiting command rx
       else
       {
-        uart1_state_last = 0;
-        uart1_state_next = 0;
-        tcp_connect(uart1_state_next);
+        if (uart1_state_next != 3)
+        {
+          uart1_state_last = uart1_state_next;
+          uart1_state_next = 0;
+          tcp_connect(uart1_state_next);
+        }
+        itoa(i, number_buff, 10);
+        ST7735_WriteString(0, 10 * 1, number_buff, Font_7x10, ST7735_YELLOW,
+                           ST7735_BLACK);
       }
     }
-    // timeout waiting command rx
     else
     {
-      if (uart1_state_next != 3)
+      for (int j = 0;; j++)
       {
-        uart1_state_last = uart1_state_next;
-        uart1_state_next = 0;
-        tcp_connect(uart1_state_next);
+        // 0.01s for rx
+        bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 10 / portTICK_PERIOD_MS);
+        if (bits & EVENT_BIT_UART1_RXCMPLT)
+        {
+          if (strstr(uart1_main_buff, "NO CARR"))
+          {
+            // close and reconnect
+            uart1_state_next = 5;
+            tcp_connect(uart1_state_next);
+            break;
+          }
+        }
+        char buff[10] = {0};
+        buff[9] = 0;
+        itoa(j, buff, 10);
+        uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
+        osDelay(1000);
       }
-      itoa(i, number_buff, 10);
-      ST7735_WriteString(0, 10 * 1, number_buff, Font_7x10, ST7735_YELLOW,
-                         ST7735_BLACK);
     }
   }
   /* USER CODE END 5 */
