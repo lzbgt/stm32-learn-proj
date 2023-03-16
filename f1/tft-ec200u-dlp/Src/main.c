@@ -94,6 +94,7 @@ void StartDefaultTask(void *argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 QueueHandle_t xUart1RxQueue = NULL;
+QueueHandle_t xUart3RxQueue = NULL;
 osThreadId_t xTrheadUart1Rx;
 
 static int uart3_result = 0;
@@ -104,11 +105,18 @@ static int uart1_state_next = 0;
 #define UART1_RX_BUFF_SIZE 400
 #define UART1_MAIN_BUFF_SIZE 400
 #define UART1_TX_BUFF_SIZE 400
+#define UART3_RX_BUFF_SIZE 1024
+#define UART3_MAIN_BUFF_SIZE 1024
+#define UART3_TX_BUFF_SIZE 400
 
 uint8_t uart1_tx_buff[UART1_TX_BUFF_SIZE] = {0};
 uint8_t uart1_rx_buff[UART1_RX_BUFF_SIZE] = {0};
 uint8_t uart1_main_buff[UART1_MAIN_BUFF_SIZE] = {0};
 int16_t uart1_rx_pos_old = 0, uart1_rx_pos;
+
+uint8_t uart3_tx_buff[UART3_TX_BUFF_SIZE] = {0};
+uint8_t uart3_rx_buff[UART3_RX_BUFF_SIZE] = {0};
+uint8_t uart3_main_buff[UART3_MAIN_BUFF_SIZE] = {0};
 
 /* Bruce:
 state machine
@@ -235,12 +243,23 @@ int tcp_connect(state)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
+  // 4G modem
   if (huart == &huart1)
   {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     BaseType_t r = xQueueSendFromISR(xUart1RxQueue, &Size, &xHigherPriorityTaskWoken);
     HAL_UART_DMAStop(&huart1);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
+    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  }
+  // TI NIRSCANNANO
+  else if (huart == &huart3)
+  {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    BaseType_t r = xQueueSendFromISR(xUart3RxQueue, &Size, &xHigherPriorityTaskWoken);
+    HAL_UART_DMAStop(&huart3);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buff, UART3_RX_BUFF_SIZE);
     __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
@@ -311,7 +330,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
   ST7735_Init();
   HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_buff, UART1_RX_BUFF_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, uart3_rx_buff, UART3_RX_BUFF_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+  __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -333,6 +354,7 @@ int main(void)
   /* add queues, ... */
   xEvtGrpUART1 = xEventGroupCreate();
   xUart1RxQueue = xQueueCreate(2, sizeof(uint16_t));
+  xUart3RxQueue = xQueueCreate(2, sizeof(uint16_t));
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -655,11 +677,26 @@ void StartDefaultTask(void *argument)
             break;
           }
         }
-        char buff[10] = {0};
-        buff[9] = 0;
-        itoa(j, buff, 10);
-        uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)buff, strlen(buff));
-        osDelay(1000);
+
+        // receive msg from uart3
+        int size = 0;
+        xQueueReceive(xUart1RxQueue, &size, portMAX_DELAY);
+        memcpy(uart3_main_buff, uart3_rx_buff, size);
+        // send to platform via 4G model
+        int sz = 0;
+        while (size > UART1_MAIN_BUFF_SIZE)
+        {
+          memcpy(uart1_tx_buff, uart3_main_buff + sz, UART1_MAIN_BUFF_SIZE);
+          uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)uart1_tx_buff, UART1_MAIN_BUFF_SIZE);
+          size -= UART1_MAIN_BUFF_SIZE;
+          sz += UART1_MAIN_BUFF_SIZE;
+        }
+
+        if (size > 0)
+        {
+          memcpy(uart1_tx_buff, uart3_main_buff + sz, size);
+          uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)uart1_tx_buff, size);
+        }
       }
     }
   }
