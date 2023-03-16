@@ -262,6 +262,8 @@ void ST7735_WriteString(uint16_t x, uint16_t y, const char *str, FontDef font, u
     str++;
   }
 
+  ST7735_FillRectangle(x, y, ST7735_WIDTH - x, ST7735_HEIGHT, bgcolor);
+
   ST7735_Unselect();
 }
 

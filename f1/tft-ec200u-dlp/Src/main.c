@@ -124,28 +124,28 @@ state machine
 */
 
 static char *
-make_tx_buffer()
+make_tx_buffer(int state)
 {
-  if (uart1_state_next == 0)
+  if (state == 0)
   {
     strcpy(uart1_tx_buff, "AT+CGATT?\r\n");
   }
-  else if (uart1_state_next == 1)
+  else if (state == 1)
   {
     strcpy(uart1_tx_buff, "ATEO\r\n");
   }
   // tcp connect
-  else if (uart1_state_next == 2)
+  else if (state == 2)
   {
     strcpy(uart1_tx_buff, "+QIOPEN=1,2,\"TCP\",47.100.172.167,30000,0,0\r\n");
   }
   // tcp send
-  else if (uart1_state_next == 3)
+  else if (state == 3)
   {
     // user fill uart1_tx_buff
   }
   // tcp close
-  else if (uart1_state_next == 4)
+  else if (state == 4)
   {
     strcpy(uart1_tx_buff, "AT+QICLOSE=0\r\n");
   }
@@ -153,39 +153,63 @@ make_tx_buffer()
   return uart1_tx_buff;
 }
 
-static int parse_result(char *buff, char *expect)
+void uart1_handle_rx(char *buff)
 {
-  int len = strlen(expect);
-  char _exp[len + 1];
-  _exp[0] = ':';
-
-  strncpy(_exp + 1, expect, len);
-  if (!strstr(buff, "OK"))
+  if (uart1_state_last == 0)
   {
-    return -1;
+    if (!strstr(buff, "OK" && !strstr(uart1_main_buff, "+CGATT: 1")))
+    {
+      // NOT OK
+      uart1_state_next = 0;
+    }
+    else
+    {
+      uart1_state_next++;
+    }
+    return;
   }
 
-  if (expect != NULL && !strstr(buff, ""))
+  if (uart1_state_last == 1)
   {
-    return -1;
+    if (!strstr(buff, "NO CARRIER"))
+    {
+      uart1_state_next = 1;
+    }
+    else
+    {
+      uart1_state_next++;
+    }
+    return;
   }
 
-  return 0;
-}
-
-int uart1_state_machine()
-{
-  char *cmd = NULL;
-  cmd = make_tx_buffer(uart1_state_next);
-  uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
-  if (uart1_state_next != 3)
+  if (uart1_state_last == 2)
   {
-    uart1_state_next += 1;
+    if (!strstr(buff, "ERROR"))
+    {
+      uart1_state_next = 3;
+    }
+    else
+    {
+      uart1_state_next = 4;
+    }
+    return;
   }
 
-  if (uart1_state_next >= 4)
+  if (uart1_state_last == 4)
   {
     uart1_state_next = 0;
+    return;
+  }
+}
+
+int tcp_connect(state)
+{
+  char *cmd = NULL;
+  cmd = make_tx_buffer(state);
+  // uart1_tx_buff has content to send
+  if (cmd[0] != 0)
+  {
+    uart1_result = HAL_UART_Transmit_DMA(&huart1, (uint8_t *)cmd, strlen(cmd));
   }
 
   return 0;
@@ -546,7 +570,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *h)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
+  int at_cmd_result = 0;
   uint16_t colors[] = {ST7735_GREEN, ST7735_RED, ST7735_BLUE, ST7735_MAGENTA,
                        ST7735_YELLOW, ST7735_WHITE, ST7735_CYAN, ST7735_BLACK};
   uint32_t tick, color;
@@ -555,7 +579,7 @@ void StartDefaultTask(void *argument)
   uint16_t currBgColor = 999999;
   ST7735_FillScreen(ST7735_BLACK);
   // osDelay(5000 / portTICK_PERIOD_MS);
-  uart1_state_machine();
+  tcp_connect(uart1_state_next);
   for (int i = 0;; i++)
   {
     itoa(uart1_result, number_buff, 10);
@@ -569,11 +593,25 @@ void StartDefaultTask(void *argument)
       if (bits & EVENT_BIT_UART1_TXCMPLT)
       {
         // wait for rx result
-        bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 10000 / portTICK_PERIOD_MS);
+        bits = xEventGroupWaitBits(xEvtGrpUART1, 0xFFFF, pdTRUE, pdFALSE, 3000 / portTICK_PERIOD_MS);
         if (bits & EVENT_BIT_UART1_RXCMPLT)
         {
-          // todo: handle packets
-          uart1_state_machine();
+          if (uart1_state_next == 3)
+          {
+            // TODO: handle rcv packet
+          }
+          else
+          {
+            uart1_handle_rx(uart1_main_buff);
+            tcp_connect(uart1_state_next);
+          }
+        }
+        else
+        {
+          // timeout rx, restart
+          uart1_state_last = 0;
+          uart1_state_next = 0;
+          tcp_connect(uart1_state_next);
         }
       }
     }
