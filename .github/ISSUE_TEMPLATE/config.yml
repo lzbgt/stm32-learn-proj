@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Paid STM32 bring-up review
+    url: https://x2.brucelu.top/iot/checkout/?source=github-issues-stm32-learn-proj
+    about: Book a focused review of STM32 UART/DMA, PWM, display, sensor/radar, flashing, and debug reliability.
+  - name: Ask a pre-sales question
+    url: https://x2.brucelu.top/products/contact/?offer=iot&source=github-issues-stm32-learn-proj
+    about: Confirm fit before checkout.
+  - name: Sample review
+    url: https://x2.brucelu.top/iot/sample/?source=github-issues-stm32-learn-proj
+    about: See the shape of the paid deliverable.
